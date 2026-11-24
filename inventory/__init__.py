@@ -97,7 +97,10 @@ def create_app(config=None):
 
     @app.errorhandler(HTTPException)
     def http_error(error):
-        return jsonify(error=error.description), error.code
+        response = error.get_response()
+        response.set_data(app.json.dumps({"error": error.description}))
+        response.mimetype = "application/json"
+        return response
 
     @app.errorhandler(OperationalError)
     def database_error(error):

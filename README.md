@@ -78,6 +78,27 @@ export TEST_DB_PASSWORD
 python -m pytest -q
 ```
 
+## API example
+
+After signing in and saving the session cookie to a cookie jar, search for an active product.
+
+```sh
+curl -fsS -b "$jar" 'http://127.0.0.1:5000/api/products?q=keyboard&page=1&per_page=10'
+```
+
+On a freshly seeded database this returns a paginated JSON response.
+
+```json
+{
+  "items": [{"id": 1, "code": "PRD-001", "name": "Keyboard", "category": "Accessories", "price": "1500.00", "stock": 20, "active": 1}],
+  "page": 1,
+  "per_page": 10,
+  "total": 1
+}
+```
+
+The sign-in and order request examples show how to obtain the cookie and use the CSRF token. [API reference](API.md)
+
 ## Files
 
 | File or directory | Contents |

@@ -265,3 +265,30 @@ def test_stock_adjustment_preserves_capacity_for_cancellation(app, client_for, d
     assert result.json["stock"] == MAX_STOCK - 2
     assert admin("POST", order_path + "/cancel").status_code == 200
     assert balances(app) == [MAX_STOCK, 5]
+
+
+def test_unsupported_method_keeps_allow_header(client_for):
+    response = client_for("sales")("POST", "/api/products")
+    assert response.status_code == 405
+    assert "GET" in response.headers["Allow"]
+    assert response.is_json and response.json["error"]
+
+
+@pytest.mark.parametrize("field", ["email", "password"])
+def test_invalid_unicode_login_returns_json_validation_error(app, field):
+    client = app.test_client()
+    token = client.get("/api/session").json["csrf_token"]
+    credentials = {"email": "sales@example.test", "password": "local-test-password"}
+    credentials[field] = "\ud800"
+    result = client.post("/api/login", json=credentials, headers={"X-CSRF-Token": token})
+    assert result.status_code == 400
+    assert result.json == {"error": "Text must use valid UTF-8."}
+
+
+def test_invalid_unicode_catalog_name_returns_json_validation_error(client_for):
+    result = client_for("admin")("POST", "/api/catalog/customers", json={
+        "name": "\ud800", "email": "test@example.test", "mobile": "1234567890",
+        "city": "Test City", "status": "Active",
+    })
+    assert result.status_code == 400
+    assert result.json == {"error": "Text must use valid UTF-8."}

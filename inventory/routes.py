@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import catalog, db, orders
 from .reports import reports
-from .validation import Problem, object_data
+from .validation import Problem, object_data, require_utf8
 
 api = Blueprint("api", __name__, url_prefix="/api")
 PASSWORD_METHOD = "pbkdf2:sha256:1000000"
@@ -51,6 +51,8 @@ def login():
         raise Problem("Enter an email and password.")
     if len(email) > 254 or len(password) > 256:
         raise Problem("Invalid email or password.", 401)
+    require_utf8(email)
+    require_utf8(password)
     user = db.query("SELECT * FROM users WHERE email=%s", (email.strip(),), one=True)
     valid = check_password_hash(user["password_hash"] if user else DUMMY_HASH, password)
     if not valid or user is None:

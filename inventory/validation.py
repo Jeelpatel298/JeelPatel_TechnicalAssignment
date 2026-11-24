@@ -14,9 +14,17 @@ class Problem(Exception):
         self.errors = errors
 
 
+def require_utf8(value):
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise Problem("Text must use valid UTF-8.") from None
+
+
 def text(value, name, limit):
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > limit:
         raise Problem(f"{name} must contain 1–{limit} characters.")
+    require_utf8(value)
     return value.strip()
 
 
