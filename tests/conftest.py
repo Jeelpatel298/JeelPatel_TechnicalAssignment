@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
 from inventory import create_app, db
+from inventory.routes import PASSWORD_METHOD
 
 load_dotenv()
 PASSWORD = "local-test-password"
@@ -43,7 +44,7 @@ def mysql_app():
 
 @pytest.fixture(scope="session")
 def password_hash():
-    return generate_password_hash(PASSWORD)
+    return generate_password_hash(PASSWORD, method=PASSWORD_METHOD)
 
 
 @pytest.fixture

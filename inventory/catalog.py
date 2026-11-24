@@ -46,9 +46,14 @@ def catalog_detail(kind, item_id, user):
     return row
 
 
+def product_code(value):
+    code = text(value, "Product code", 40)
+    return text(code.upper(), "Product code", 40)
+
+
 def product_fields(data):
     return {
-        "code": text(data.get("code"), "Product code", 40).upper(),
+        "code": product_code(data.get("code")),
         "name": text(data.get("name"), "Product name", 120),
         "category": text(data.get("category"), "Category", 80),
         "price": decimal(data.get("price"), "Price", MAX_PRICE),
@@ -162,7 +167,7 @@ def import_products(upload, user):
                     if len(values) != len(headers):
                         raise Problem("Column count does not match the header.")
                     row = dict(zip(headers, values))
-                    code = text(row["product_code"], "Product code", 40).upper()
+                    code = product_code(row["product_code"])
                     if code in seen:
                         raise Problem("Duplicate product code in the file.")
                     seen.add(code)

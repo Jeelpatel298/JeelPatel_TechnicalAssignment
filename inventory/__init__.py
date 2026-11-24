@@ -1,9 +1,10 @@
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from hmac import compare_digest
 
 from flask import Flask, g, jsonify, redirect, render_template, request, session, url_for
+from flask.json.provider import DefaultJSONProvider
 from pymysql.err import OperationalError
 from werkzeug.exceptions import HTTPException
 
@@ -12,8 +13,19 @@ from .routes import api, register_cli
 from .validation import Problem
 
 
+class ISOJSONProvider(DefaultJSONProvider):
+    @staticmethod
+    def default(value):
+        if isinstance(value, datetime):
+            return value.replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
+        if isinstance(value, date):
+            return value.isoformat()
+        return DefaultJSONProvider.default(value)
+
+
 def create_app(config=None):
     app = Flask(__name__)
+    app.json = ISOJSONProvider(app)
     app.config.update(
         SECRET_KEY=os.getenv("SECRET_KEY"),
         DATABASE={

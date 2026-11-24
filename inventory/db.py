@@ -39,7 +39,7 @@ def transaction():
 def query(sql, args=(), *, one=False):
     with connection().cursor() as cursor:
         cursor.execute(sql, args)
-        return cursor.fetchone() if one else cursor.fetchall()
+        return cursor.fetchone() if one else list(cursor.fetchall())
 
 
 def execute(sql, args=()):

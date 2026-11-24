@@ -10,7 +10,8 @@ from .reports import reports
 from .validation import Problem, object_data
 
 api = Blueprint("api", __name__, url_prefix="/api")
-DUMMY_HASH = generate_password_hash("unused-login-fallback")
+PASSWORD_METHOD = "pbkdf2:sha256:1000000"
+DUMMY_HASH = generate_password_hash("unused-login-fallback", method=PASSWORD_METHOD)
 
 
 def protected(*, admin=False):
@@ -99,7 +100,7 @@ def catalog_update(kind, item_id):
 @api.delete("/catalog/<kind>/<int:item_id>")
 @protected(admin=True)
 def catalog_delete(kind, item_id):
-    catalog.delete_record(catalog_kind(kind), item_id, g.user)
+    catalog.delete_record(catalog_kind(kind), item_id)
     return "", 204
 
 
@@ -184,7 +185,7 @@ def register_cli(app):
             password = click.prompt(f"Password for {email}", hide_input=True, confirmation_prompt=True)
             if not 8 <= len(password) <= 256:
                 raise click.ClickException("Use a password between 8 and 256 characters.")
-            passwords[email] = generate_password_hash(password)
+            passwords[email] = generate_password_hash(password, method=PASSWORD_METHOD)
         with db.transaction():
             for name, email, role in users:
                 user_id = catalog.insert_record("users", {

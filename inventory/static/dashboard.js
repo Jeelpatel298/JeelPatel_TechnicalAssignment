@@ -9,7 +9,10 @@ const dialogForm = document.querySelector('#dialog-form');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[char]);
-const currency = value => '₹' + String(value).replace(/\B(?=(\d{3})+(?!\d|\.))/g, ',');
+const currency = value => {
+  const [whole, fractional = '00'] = String(value).split('.');
+  return '₹' + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + fractional;
+};
 const heading = (title, description, action = '') =>
   `<header class="heading"><div><h1>${title}</h1><p>${description}</p></div>${action}</header>`;
 const badge = status => `<span class="badge ${escape(status.toLowerCase())}">${escape(status)}</span>`;
