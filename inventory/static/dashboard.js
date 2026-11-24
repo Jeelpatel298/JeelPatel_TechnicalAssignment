@@ -6,6 +6,7 @@ const view = document.querySelector('#view');
 const notice = document.querySelector('#notice');
 const dialog = document.querySelector('#editor');
 const dialogForm = document.querySelector('#dialog-form');
+const dialogClose = document.querySelector('#dialog-close');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[char]);
@@ -72,20 +73,30 @@ function openDialog(title, fields, action) {
   dialog.showModal();
 }
 
-dialog.querySelector('#dialog-close').onclick = () => dialog.close();
-dialogForm.onsubmit = event => {
+dialogClose.onclick = () => dialog.close();
+dialogForm.onsubmit = async event => {
   event.preventDefault();
+  if (dialogClose.disabled) return;
   const box = dialog.querySelector('#dialog-error');
   box.hidden = true;
-  busy(event.submitter, async () => {
-    const result = await dialogAction(Object.fromEntries(new FormData(dialogForm)));
-    dialog.close();
-    await result.refresh();
-    feedback(result.message);
-  }, error => feedback(error.message, true, error.rows, box));
+  dialogClose.disabled = true;
+  try {
+    await busy(event.submitter, async () => {
+      const result = await dialogAction(Object.fromEntries(new FormData(dialogForm)));
+      try {
+        await result.refresh();
+        feedback(result.message);
+      } catch (error) {
+        feedback('Saved successfully. The list could not refresh. ' + error.message, true);
+      }
+      dialog.close();
+    }, error => feedback(error.message, true, error.rows, box));
+  } finally {
+    dialogClose.disabled = false;
+  }
 };
 dialog.addEventListener('cancel', event => {
-  if (dialogForm.querySelector('button:disabled')) event.preventDefault();
+  if (dialogClose.disabled) event.preventDefault();
 });
 
 function recordEditor(kind, row, refresh) {

@@ -11,3 +11,5 @@
 **Corrections** — The initial MySQL schema used column-level CHECK constraints for rules involving multiple columns. MySQL rejected those definitions, so they were moved to table-level CHECK constraints. The first implementation also relied on Werkzeug's default scrypt hash, which was unavailable in the system Python build used for verification. It now selects salted PBKDF2-SHA256 explicitly. Order dates and movement timestamps were switched to ISO strings so browser date fields receive the expected format.
 
 A second review added regression tests for malformed CSV line numbers and invalid prices, and moved the report queries into one consistent MySQL snapshot to keep concurrent updates from producing contradictory sections.
+
+A further review added regression tests for a cancellation immediately after confirmation and for stock adjustments close to the database limit. The application now captures mutation responses inside the transaction and keeps enough capacity for confirmed orders to return stock. The browser review also caught a catalog editor that could be dismissed during a save. Its close controls now wait for the request to finish.

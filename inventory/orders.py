@@ -17,20 +17,23 @@ def accessible_order(order_id, user, *, lock=False):
     return order
 
 
+def add_order_details(order):
+    customer = query("SELECT name, active FROM customers WHERE id=%s",
+                     (order["customer_id"],), one=True)
+    order["customer_name"] = customer["name"]
+    order["customer_active"] = customer["active"]
+    order["items"] = query(
+        """SELECT i.product_id, i.quantity, i.rate, i.amount,
+                  p.code, p.name, p.stock, p.active
+           FROM order_items i JOIN products p ON p.id=i.product_id
+           WHERE i.order_id=%s ORDER BY i.id""", (order["id"],)
+    )
+    return order
+
+
 def order_detail(order_id, user):
     with transaction():
-        order = accessible_order(order_id, user)
-        customer = query("SELECT name, active FROM customers WHERE id=%s",
-                         (order["customer_id"],), one=True)
-        order["customer_name"] = customer["name"]
-        order["customer_active"] = customer["active"]
-        order["items"] = query(
-            """SELECT i.product_id, i.quantity, i.rate, i.amount,
-                      p.code, p.name, p.stock, p.active
-               FROM order_items i JOIN products p ON p.id=i.product_id
-               WHERE i.order_id=%s ORDER BY i.id""", (order_id,)
-        )
-    return order
+        return add_order_details(accessible_order(order_id, user))
 
 
 def list_orders(user):
@@ -121,7 +124,7 @@ def save_draft(data, user, order_id=None):
                    VALUES (%s,%s,%s,%s,%s)""",
                 (order_id, item["product_id"], item["quantity"], item["rate"], item["amount"]),
             )
-    return order_detail(order_id, user)
+        return add_order_details(accessible_order(order_id, user))
 
 
 def movement(product_id, kind, change, reason, user_id, order_id=None):
@@ -157,4 +160,5 @@ def change_status(order_id, target, user):
                     execute("UPDATE products SET stock=%s WHERE id=%s", (balance, product["id"]))
                     movement(product["id"], kind, change, reason, user["id"], order_id)
             execute("UPDATE orders SET status=%s WHERE id=%s", (target, order_id))
-    return order_detail(order_id, user)
+            order["status"] = target
+        return add_order_details(order)

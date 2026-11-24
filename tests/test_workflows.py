@@ -1,11 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from io import BytesIO
 from threading import Barrier
 
 import pytest
+from flask import request
 
+import inventory.orders as orders_module
 import inventory.reports as reports_module
 from inventory import db
+from inventory.validation import MAX_STOCK
 
 
 def create(client, draft):
@@ -216,3 +220,48 @@ def test_reports_use_one_snapshot_when_an_order_is_cancelled(client_for, draft, 
     assert [row["code"] for row in report["products"]] == ["MSE", "KEY"]
     assert [row["code"] for row in report["low_stock"]] == ["MSE"]
     assert {row["movement_type"] for row in report["movements"]} == {"Sale"}
+
+
+def test_confirmation_response_survives_immediate_cancellation(client_for, draft, monkeypatch):
+    sales, admin = client_for("sales"), client_for("admin")
+    path = f"/api/orders/{create(sales, draft)['id']}"
+    transaction = orders_module.transaction
+    cancelled = False
+
+    @contextmanager
+    def cancel_after_confirmation_commit():
+        nonlocal cancelled
+        with transaction():
+            yield
+        if request.path == path + "/confirm" and not cancelled:
+            cancelled = True
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                response = pool.submit(admin, "POST", path + "/cancel").result(timeout=10)
+            assert response.status_code == 200
+
+    monkeypatch.setattr(orders_module, "transaction", cancel_after_confirmation_commit)
+    response = sales("POST", path + "/confirm")
+
+    assert response.status_code == 200
+    assert response.json["status"] == "Confirmed"
+    assert [item["stock"] for item in response.json["items"]] == [18, 2]
+    assert sales("GET", path).json["status"] == "Cancelled"
+
+
+def test_stock_adjustment_preserves_capacity_for_cancellation(app, client_for, draft):
+    admin = client_for("admin")
+    order_path = f"/api/orders/{create(admin, draft)['id']}"
+    assert admin("POST", order_path + "/confirm").status_code == 200
+    product = app.config["TEST_PRODUCTS"][0]
+    adjustment_path = f"/api/products/{product}/adjust"
+    # There are 18 in stock and 2 more units might return on cancellation.
+    result = admin("POST", adjustment_path, json={"change": MAX_STOCK - 19, "reason": "Count"})
+    assert result.status_code == 409
+    assert balances(app) == [18, 2]
+    assert [row["movement_type"] for row in movements(app)] == ["Sale", "Sale"]
+
+    result = admin("POST", adjustment_path, json={"change": MAX_STOCK - 20, "reason": "Count"})
+    assert result.status_code == 200
+    assert result.json["stock"] == MAX_STOCK - 2
+    assert admin("POST", order_path + "/cancel").status_code == 200
+    assert balances(app) == [MAX_STOCK, 5]

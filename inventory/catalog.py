@@ -137,6 +137,16 @@ def adjust_stock(product_id, data, user):
         balance = product["stock"] + change
         if not 0 <= balance <= MAX_STOCK:
             raise Problem("This adjustment would put stock outside the allowed range.", 409)
+        if change > 0:
+            returnable = query(
+                """SELECT COALESCE(SUM(i.quantity), 0) AS quantity
+                   FROM order_items i JOIN orders o ON o.id=i.order_id
+                   WHERE i.product_id=%s AND o.status='Confirmed'""",
+                (product_id,), one=True,
+            )["quantity"]
+            if balance + returnable > MAX_STOCK:
+                raise Problem("This adjustment would leave too little capacity to restore "
+                              "stock if confirmed orders are cancelled.", 409)
         execute("UPDATE products SET stock=%s WHERE id=%s", (balance, product_id))
         movement(product_id, "Adjustment", change, reason, user["id"])
     return catalog_detail("products", product_id, user)
