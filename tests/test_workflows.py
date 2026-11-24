@@ -1,0 +1,175 @@
+from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
+from threading import Barrier
+
+import pytest
+
+from inventory import db
+
+
+def create(client, draft):
+    result = client("POST", "/api/orders", json=draft)
+    assert result.status_code == 201, result.json
+    return result.json
+
+
+def balances(app):
+    with app.app_context():
+        return [row["stock"] for row in db.query("SELECT stock FROM products ORDER BY id")]
+
+
+def movements(app):
+    with app.app_context():
+        return db.query("SELECT movement_type,quantity_change FROM stock_movements ORDER BY id")
+
+
+def test_order_totals_and_saved_rate(app, client_for, draft):
+    sales, admin = client_for("sales"), client_for("admin")
+    draft.update(grand_total=1, status="Confirmed", created_by=999)
+    draft["items"][0]["rate"] = 1
+    order = create(sales, draft)
+    assert order["status"] == "Draft"
+    assert order["created_by"] != 999
+    assert [order[key] for key in ("subtotal", "discount_amount", "grand_total")] == [
+        "4500.00", "450.00", "4050.00",
+    ]
+    assert balances(app) == [20, 5]
+    product = app.config["TEST_PRODUCTS"][0]
+    response = admin("PUT", f"/api/catalog/products/{product}", json={
+        "code": "KEY", "name": "Keyboard", "category": "Demo", "price": 5000, "status": "Active",
+    })
+    assert response.status_code == 200
+    draft["items"][0]["quantity"] = 1
+    changed = sales("PUT", f"/api/orders/{order['id']}", json=draft)
+    assert changed.status_code == 200
+    assert changed.json["items"][0]["rate"] == "1500.00"
+    assert changed.json["grand_total"] == "2700.00"
+
+
+@pytest.mark.parametrize("qty", [0, -1, 1.5, True])
+def test_reject_bad_quantity(client_for, draft, qty):
+    draft["items"][0]["quantity"] = qty
+    assert client_for("sales")("POST", "/api/orders", json=draft).status_code == 400
+
+
+@pytest.mark.parametrize("discount", ["-0.01", "20.01", "NaN", "1.001"])
+def test_reject_bad_discount(client_for, draft, discount):
+    draft["discount_pct"] = discount
+    assert client_for("sales")("POST", "/api/orders", json=draft).status_code == 400
+
+
+def test_confirm_cancel_idempotently(app, client_for, draft):
+    client = client_for("sales")
+    path = f"/api/orders/{create(client, draft)['id']}"
+    for _ in range(2):
+        result = client("POST", path + "/confirm")
+        assert result.status_code == 200 and result.json["status"] == "Confirmed"
+        assert balances(app) == [18, 2]
+        assert [row["quantity_change"] for row in movements(app)] == [-2, -3]
+    assert client("PUT", path, json=draft).status_code == 409
+    for _ in range(2):
+        result = client("POST", path + "/cancel")
+        assert result.status_code == 200 and result.json["status"] == "Cancelled"
+        assert balances(app) == [20, 5]
+        assert [row["quantity_change"] for row in movements(app)] == [-2, -3, 2, 3]
+    assert client("POST", path + "/confirm").status_code == 409
+
+
+def test_cancel_draft_has_no_stock_effect(app, client_for, draft):
+    client = client_for("sales")
+    order = create(client, draft)
+    assert client("POST", f"/api/orders/{order['id']}/cancel").json["status"] == "Cancelled"
+    assert balances(app) == [20, 5] and movements(app) == []
+
+
+def test_insufficient_stock_rolls_back_entire_order(app, client_for, draft):
+    client = client_for("sales")
+    draft["items"][1]["quantity"] = 6
+    path = f"/api/orders/{create(client, draft)['id']}"
+    assert client("POST", path + "/confirm").status_code == 409
+    assert client("GET", path).json["status"] == "Draft"
+    assert balances(app) == [20, 5] and movements(app) == []
+
+
+def test_two_sales_users_cannot_oversell(app, client_for, draft):
+    clients = [client_for("sales"), client_for("other")]
+    paths = [f"/api/orders/{create(client, draft)['id']}/confirm" for client in clients]
+    gate = Barrier(2, timeout=10)
+
+    def confirm(index):
+        gate.wait()
+        return clients[index]("POST", paths[index]).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(confirm, range(2))) == [200, 409]
+    assert balances(app) == [18, 2]
+    assert len(movements(app)) == 2
+
+
+def test_permissions_and_csrf(app, client_for, draft):
+    owner, other = client_for("sales"), client_for("other")
+    order = create(owner, draft)
+    path = f"/api/orders/{order['id']}"
+    for method, suffix in (("GET", ""), ("PUT", ""), ("POST", "/confirm"), ("POST", "/cancel")):
+        assert other(method, path + suffix, json=draft).status_code == 403
+    assert other("GET", "/api/orders").json["items"] == []
+    assert other("GET", "/api/reports").status_code == 403
+    assert other("POST", "/api/catalog/products", json={}).status_code == 403
+    assert other("POST", "/api/products/import").status_code == 403
+    assert app.test_client().get(path).status_code == 401
+    assert app.test_client().post("/api/login", json={}).status_code == 403
+    assert client_for("admin")("GET", path).status_code == 200
+
+
+def test_reports_count_order_once_and_keep_zero_customers(client_for, draft):
+    admin = client_for("admin")
+    order = create(admin, draft)
+    assert admin("POST", f"/api/orders/{order['id']}/confirm").status_code == 200
+    report = admin("GET", "/api/reports?start=2025-01-01&end=2025-01-31&threshold=3").json
+    assert [(row["order_count"], row["total"]) for row in report["customers"]] == [
+        (1, "4050.00"), (0, "0.00"),
+    ]
+    assert [(row["code"], row["gross"]) for row in report["products"]] == [
+        ("MSE", "1500.00"), ("KEY", "3000.00"),
+    ]
+    assert [row["code"] for row in report["low_stock"]] == ["MSE"]
+    outside = admin("GET", "/api/reports?start=2025-02-01").json
+    assert all(row["order_count"] == 0 for row in outside["customers"])
+
+
+def test_stock_adjustment_and_referenced_delete(app, client_for, draft):
+    admin = client_for("admin")
+    product = app.config["TEST_PRODUCTS"][0]
+    customer = app.config["TEST_CUSTOMERS"][0]
+    create(admin, draft)
+    assert admin("DELETE", f"/api/catalog/customers/{customer}").status_code == 409
+    assert admin("DELETE", f"/api/catalog/products/{product}").status_code == 409
+    path = f"/api/products/{product}/adjust"
+    assert admin("POST", path, json={"change": -21, "reason": "Count"}).status_code == 409
+    assert admin("POST", path, json={"change": 3}).status_code == 400
+    assert admin("POST", path, json={"change": 3, "reason": "Count"}).json["stock"] == 23
+    assert movements(app) == [{"movement_type": "Adjustment", "quantity_change": 3}]
+
+
+def upload(client, lines):
+    csv = "product_code,product_name,category,price,stock_quantity,status\n" + lines
+    return client("POST", "/api/products/import", data={"file": (BytesIO(csv.encode()), "import.csv")})
+
+
+def test_csv_invalid_row_imports_nothing(app, client_for):
+    admin = client_for("admin")
+    response = upload(admin, "NEW,New Product,Demo,12,3,Active\nBAD,Bad Product,Demo,-1,4,Active\n")
+    assert response.status_code == 400
+    assert response.json["errors"][0]["row"] == 3
+    assert admin("GET", "/api/products?q=NEW").json["total"] == 0
+    assert movements(app) == []
+
+
+def test_csv_valid_then_existing_code(app, client_for):
+    admin = client_for("admin")
+    rows = "NEW,New Product,Demo,12.50,3,Active\nOLD,Archived,Demo,0,0,Inactive\n"
+    assert upload(admin, rows).json == {"imported": 2}
+    assert movements(app) == [{"movement_type": "Opening", "quantity_change": 3}]
+    assert upload(admin, rows).status_code == 400
+    assert admin("GET", "/api/products?q=OLD").json["total"] == 0
+    assert admin("GET", "/api/catalog/products?q=OLD&status=Inactive").json["total"] == 1
