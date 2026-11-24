@@ -1,0 +1,5 @@
+product_code,product_name,category,price,stock_quantity,status
+BAD-001,Cable Sleeve,Accessories,200,10,Active
+BAD-002,Travel Hub,Connectivity,-50,4,Active
+BAD-001,Cable Sleeve Duplicate,Accessories,200,10,Active
+BAD-003,USB Adapter,Connectivity,200,2.5,Pending
