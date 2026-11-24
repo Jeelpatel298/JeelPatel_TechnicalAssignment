@@ -108,7 +108,7 @@ def save_record(kind, data, user, item_id=None):
     return catalog_detail(kind, item_id, user)
 
 
-def delete_record(kind, item_id, user):
+def delete_record(kind, item_id):
     with transaction():
         row = query(f"SELECT id FROM {kind} WHERE id=%s FOR UPDATE", (item_id,), one=True)
         if row is None:
