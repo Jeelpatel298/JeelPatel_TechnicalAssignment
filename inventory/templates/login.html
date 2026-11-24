@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Sign in · Sales &amp; Inventory{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='login.js') }}"></script>{% endblock %}
+{% block content %}
+<main class="login">
+  <section class="login-intro">
+    <span class="brand-mark" aria-hidden="true">SI</span>
+    <h1>Sales &amp;<br>Inventory</h1>
+    <p>Manage customer orders and keep stock up to date.</p>
+  </section>
+  <section class="login-form">
+    <form id="login-form">
+      <h2>Sign in</h2>
+      <label>Email <input type="email" name="email" autocomplete="username" maxlength="254" required></label>
+      <label>Password <input type="password" name="password" autocomplete="current-password" maxlength="256" required></label>
+      <p id="login-error" class="notice error" role="alert" hidden></p>
+      <button>Sign in</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

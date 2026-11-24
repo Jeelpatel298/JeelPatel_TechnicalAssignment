@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='dashboard.js') }}"></script>{% endblock %}
+{% block content %}
+<div class="shell" data-admin="{{ 'true' if user.role == 'admin' else 'false' }}" data-today="{{ today }}">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">SI</span> Sales &amp; Inventory</a>
+    <nav aria-label="Workspace">
+      <a href="#orders">Sales orders</a>
+      <a href="#customers">Customers</a>
+      <a href="#products">Products</a>
+      {% if user.role == 'admin' %}
+      <a href="#reports">Reports</a>
+      <a href="#import">CSV import</a>
+      {% endif %}
+    </nav>
+    <div class="account"><strong>{{ user.name }}</strong><span>{{ 'Admin' if user.role == 'admin' else 'Sales User' }}</span>
+      <button id="logout" class="plain">Sign out</button>
+    </div>
+  </aside>
+  <main class="workspace">
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div id="view" aria-live="polite"></div>
+  </main>
+</div>
+<dialog id="editor" aria-labelledby="dialog-title">
+  <form id="dialog-form">
+    <h2 id="dialog-title"></h2>
+    <div id="dialog-fields" class="fields"></div>
+    <div id="dialog-error" class="notice error" role="alert" hidden></div>
+    <div class="actions"><button class="secondary" type="button" id="dialog-close">Cancel</button><button>Save</button></div>
+  </form>
+</dialog>
+{% endblock %}
