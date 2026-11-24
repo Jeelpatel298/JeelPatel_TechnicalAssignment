@@ -152,6 +152,7 @@ def import_products(upload, user):
 
     reader = csv.reader(io.StringIO(raw, newline=""), strict=True)
     errors, valid, seen = [], [], set()
+    line = 1
     try:
         headers = next(reader, [])
         if len(headers) != len(CSV_FIELDS) or set(headers) != set(CSV_FIELDS):
@@ -192,5 +193,5 @@ def import_products(upload, user):
                     raise
     except csv.Error:
         raise Problem("Invalid CSV format. No products were imported.",
-                      errors=[{"row": reader.line_num + 1, "reason": "Malformed CSV row."}]) from None
+                      errors=[{"row": line, "reason": "Malformed CSV row."}]) from None
     return len(valid)

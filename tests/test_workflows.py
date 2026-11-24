@@ -4,6 +4,7 @@ from threading import Barrier
 
 import pytest
 
+import inventory.reports as reports_module
 from inventory import db
 
 
@@ -173,3 +174,45 @@ def test_csv_valid_then_existing_code(app, client_for):
     assert upload(admin, rows).status_code == 400
     assert admin("GET", "/api/products?q=OLD").json["total"] == 0
     assert admin("GET", "/api/catalog/products?q=OLD&status=Inactive").json["total"] == 1
+
+
+def test_csv_malformed_record_reports_its_starting_line(app, client_for):
+    admin = client_for("admin")
+    response = upload(admin, 'NEW,New Product,Demo,12,3,Active\nBAD,"Unclosed field\non two lines\n')
+    assert response.status_code == 400
+    assert response.json["errors"] == [{"row": 3, "reason": "Malformed CSV row."}]
+    assert admin("GET", "/api/products?q=NEW").json["total"] == 0
+    assert movements(app) == []
+
+
+def test_csv_rejects_price_with_underscore(app, client_for):
+    admin = client_for("admin")
+    response = upload(admin, "NEW,New Product,Demo,1_000,3,Active\n")
+    assert response.status_code == 400
+    assert response.json["errors"] == [{"row": 2, "reason": "Price must be a number."}]
+    assert movements(app) == []
+
+
+def test_reports_use_one_snapshot_when_an_order_is_cancelled(client_for, draft, monkeypatch):
+    admin = client_for("admin")
+    sales = client_for("sales")
+    order = create(sales, draft)
+    path = f"/api/orders/{order['id']}"
+    assert sales("POST", path + "/confirm").status_code == 200
+    query = reports_module.query
+
+    def cancel_after_customer_summary(sql, args=()):
+        result = query(sql, args)
+        if "FROM customers" in sql:
+            # Each request needs its own MySQL connection.
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                cancelled = pool.submit(sales, "POST", path + "/cancel").result(timeout=10)
+            assert cancelled.status_code == 200
+        return result
+
+    monkeypatch.setattr(reports_module, "query", cancel_after_customer_summary)
+    report = admin("GET", "/api/reports?threshold=3").json
+    assert report["customers"][0]["order_count"] == 1
+    assert [row["code"] for row in report["products"]] == ["MSE", "KEY"]
+    assert [row["code"] for row in report["low_stock"]] == ["MSE"]
+    assert {row["movement_type"] for row in report["movements"]} == {"Sale"}

@@ -31,9 +31,11 @@ def integer(value, name, minimum=1, maximum=MAX_STOCK):
 
 
 def decimal(value, name, ceiling):
-    raw = str(value)
+    raw = str(value).strip()
     if len(raw) > 40:
         raise Problem(f"{name} is too long.")
+    if not re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", raw):
+        raise Problem(f"{name} must be a number.")
     try:
         number = Decimal(raw)
     except InvalidOperation:

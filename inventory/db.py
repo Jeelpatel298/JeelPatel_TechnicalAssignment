@@ -13,7 +13,7 @@ def connection():
             charset="utf8mb4",
             cursorclass=DictCursor,
             connect_timeout=5,
-            init_command="SET time_zone = '+00:00'",
+            init_command="SET time_zone = '+00:00', transaction_isolation = 'REPEATABLE-READ'",
         )
     return g.db
 
