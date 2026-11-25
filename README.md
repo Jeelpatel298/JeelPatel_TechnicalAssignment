@@ -43,6 +43,17 @@ Use Python 3.9 or later, MySQL 8.4 with InnoDB, and a current browser with JavaS
 | sales@example.test | Sales User | Browse active customers and products and manage their own orders |
 | sales2@example.test | Sales User | A separate account for verifying order isolation |
 
+## Load the sample catalog with SQL
+
+After `init-db`, you can load the catalog directly into an empty database.
+
+```sh
+mysql -h 127.0.0.1 -u inventory_app -p sales_inventory < sql/sample_data.sql
+flask --app inventory seed --accounts-only
+```
+
+The SQL file starts product balances at zero. After signing in as Admin, use **Adjust stock** to enter balances with a reason. Use the regular `seed` command on an empty database for the walkthrough's preset balances.
+
 ## Basic workflow
 
 1. Sign in as a Sales User. Create a draft for Aster Retail with two keyboards, three mice, and a 10% discount. Expected subtotal, discount and total are ₹4,500.00, ₹450.00 and ₹4,050.00.
@@ -53,6 +64,7 @@ Use Python 3.9 or later, MySQL 8.4 with InnoDB, and a current browser with JavaS
 ## Database and correctness
 
 - Customers and users each relate to many orders. An order relates to products through its order items, with a unique order/product pair. Stock movements link to a product and the acting user, and can link to an order. Foreign keys protect historical references. Referenced customer or product records can be deactivated.
+- New order numbers use the UTC creation year and a zero-padded database ID, for example `SO-2026-000001`. The number stays fixed when a draft is edited. MySQL may leave gaps in the IDs.
 - Money uses MySQL `DECIMAL` and Python `Decimal`. Subtotal is the sum of line amounts. The discount is rounded to the nearest cent using half-up rounding, then subtracted. Existing draft items retain their captured rates during quantity edits. Newly added products use the current price. Browser previews use integer cents.
 - Confirmation and cancellation lock the order row first. They then lock relevant product rows in ascending primary-key order. The locks serialize status changes for the same order and competing changes to the same stock. Writes to order state, product balances, and movement records commit together. Insufficient stock rolls back every write. A repeated action targeting the current status returns that order with zero additional movement. Mutation responses capture the order as saved by that request, even if another action follows immediately.
 - Adjustments lock the product row before checking its new balance. Increases must leave room under the stock limit for units that could be restored by cancelling confirmed orders. Positive opening balances from creation or CSV import get an Opening movement. Zero opening balances create no stock change. CSV validation and insertion run in a transaction, and a unique product code constraint catches a conflicting insert.
@@ -63,9 +75,10 @@ See the [MySQL locking reads reference](https://dev.mysql.com/doc/refman/8.4/en/
 
 ## Run the tests
 
-Run just the calculation and debugging tests without MySQL.
+Install the development requirements, then run just the calculation and debugging tests without MySQL.
 
 ```sh
+python -m pip install -r requirements-dev.txt
 python -m pytest -q tests/test_pricing.py
 ```
 

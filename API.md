@@ -53,7 +53,7 @@ curl -fsS -b "$jar" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json'
 ```json
 {
   "id": 1,
-  "number": "SO-4D8D4F3458214E64AC7585D64E9D20D2",
+  "number": "SO-2026-000001",
   "customer_id": 1,
   "order_date": "2026-11-24",
   "status": "Draft",
@@ -99,7 +99,7 @@ Successful actions return `200 OK` and the updated order, with `"status":"Confir
 | POST /api/products/import | Admin uploads a multipart `file`. A successful import returns `201` and `{"imported":2}`. Validation errors include an `errors` list of row numbers and reasons. |
 | GET /api/reports | Admin retrieves `customers`, `products`, `low_stock`, and `movements`. Optional parameters are `start`, `end`, and `threshold`. |
 
-Dates use ISO format and money values are returned as strings. Common error responses use `{"error":"message"}`. Invalid inputs return 400, unauthenticated protected requests return 401, access and CSRF failures return 403, missing records return 404, and business conflicts return 409.
+Dates use ISO format and money values are returned as strings. Common error responses use `{"error":"message"}`. Invalid inputs return 400, unauthenticated protected requests return 401, role and CSRF failures return 403, missing records and orders outside a Sales User’s access return 404, and business conflicts return 409.
 
 ```sh
 curl -fsS -b "$jar" -H "X-CSRF-Token: $csrf" -X POST "$base/api/logout"

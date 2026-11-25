@@ -8,12 +8,16 @@ from .validation import MAX_STOCK, Problem, decimal, integer, object_data, order
 
 
 def accessible_order(order_id, user, *, lock=False):
-    suffix = " FOR UPDATE" if lock else ""
-    order = query("SELECT * FROM orders WHERE id=%s" + suffix, (order_id,), one=True)
+    sql = "SELECT * FROM orders WHERE id=%s"
+    params = (order_id,)
+    if user["role"] != "admin":
+        sql += " AND created_by=%s"
+        params += (user["id"],)
+    if lock:
+        sql += " FOR UPDATE"
+    order = query(sql, params, one=True)
     if order is None:
         raise Problem("Order not found.", 404)
-    if user["role"] != "admin" and order["created_by"] != user["id"]:
-        raise Problem("You can only access your own orders.", 403)
     return order
 
 
@@ -109,8 +113,11 @@ def save_draft(data, user, order_id=None):
                 """INSERT INTO orders (customer_id, order_date, discount_pct, subtotal,
                        discount_amount, grand_total, number, created_by)
                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (*values, f"SO-{uuid4().hex.upper()}", user["id"]),
+                (*values, uuid4().hex, user["id"]),
             )
+            # Finalize the number in the same transaction as the insert.
+            number = f"SO-{datetime.now(timezone.utc).year}-{order_id:06d}"
+            execute("UPDATE orders SET number=%s WHERE id=%s", (number, order_id))
         else:
             execute(
                 """UPDATE orders SET customer_id=%s, order_date=%s, discount_pct=%s,

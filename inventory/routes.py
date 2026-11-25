@@ -162,28 +162,35 @@ def report_data():
     return jsonify(reports(request.args))
 
 
+def run_sql_file(app, filename):
+    script = Path(app.root_path).parent / "sql" / filename
+    for statement in script.read_text(encoding="utf-8").split(";"):
+        if statement.strip():
+            db.execute(statement)
+
+
 def register_cli(app):
     @app.cli.command("init-db")
     def init_db():
-        schema = Path(app.root_path).parent / "sql" / "schema.sql"
-        for statement in schema.read_text().split(";"):
-            if statement.strip():
-                db.execute(statement)
+        run_sql_file(app, "schema.sql")
         click.echo("Database schema is ready.")
 
     @app.cli.command("seed")
-    def seed():
-        """Create three demo users and sample catalog data in an empty database."""
-        if db.query("SELECT id FROM users LIMIT 1") or db.query("SELECT id FROM customers LIMIT 1") \
-                or db.query("SELECT id FROM products LIMIT 1"):
-            raise click.ClickException("Seed requires an empty catalog and user table.")
+    @click.option("--accounts-only", is_flag=True, help="Keep existing catalog data.")
+    def seed(accounts_only):
+        """Create demo accounts and optionally load the sample catalog."""
+        if db.query("SELECT id FROM users LIMIT 1"):
+            raise click.ClickException("Seed requires an empty user table.")
+        if not accounts_only and (db.query("SELECT id FROM customers LIMIT 1")
+                                  or db.query("SELECT id FROM products LIMIT 1")):
+            raise click.ClickException("The catalog already has data. Use --accounts-only to keep it.")
         passwords = {}
         users = (
             ("Demo Admin", "admin@example.test", "admin"),
             ("Demo Sales", "sales@example.test", "sales"),
             ("Second Sales", "sales2@example.test", "sales"),
         )
-        for name, email, _ in users:
+        for _, email, _ in users:
             password = click.prompt(f"Password for {email}", hide_input=True, confirmation_prompt=True)
             if not 8 <= len(password) <= 256:
                 raise click.ClickException("Use a password between 8 and 256 characters.")
@@ -195,18 +202,10 @@ def register_cli(app):
                 })
                 if role == "admin":
                     admin_id = user_id
-            for name, email, mobile, city in (
-                ("Aster Retail", "hello@aster.example", "+91 90000 00001", "Ahmedabad"),
-                ("Bluebird Office", "hello@bluebird.example", "+91 90000 00002", "Surat"),
-                ("Cedar Supply", "hello@cedar.example", "+91 90000 00003", "Vadodara"),
-            ):
-                catalog.insert_record("customers", dict(name=name, email=email, mobile=mobile, city=city))
-            for code, name, category, price, stock in (
-                ("PRD-001", "Keyboard", "Accessories", "1500.00", 20),
-                ("PRD-002", "Mouse", "Accessories", "500.00", 50),
-                ("PRD-003", "USB-C Hub", "Connectivity", "1899.00", 4),
-                ("PRD-004", "Monitor Riser", "Workspace", "2400.00", 8),
-            ):
-                catalog.insert_product(dict(code=code, name=name, category=category, price=price),
-                                       stock, "Sample opening stock", admin_id)
-        click.echo("Demo accounts and sample catalog created.")
+            if not accounts_only:
+                run_sql_file(app, "sample_data.sql")
+                for code, stock in (("PRD-001", 20), ("PRD-002", 50), ("PRD-003", 4), ("PRD-004", 8)):
+                    product = db.query("SELECT id FROM products WHERE code=%s", (code,), one=True)
+                    db.execute("UPDATE products SET stock=%s WHERE id=%s", (stock, product["id"]))
+                    orders.movement(product["id"], "Opening", stock, "Sample opening stock", admin_id)
+        click.echo("Demo accounts created." if accounts_only else "Demo accounts and sample catalog created.")

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from io import BytesIO
 from threading import Barrier
 
@@ -116,7 +117,10 @@ def test_permissions_and_csrf(app, client_for, draft):
     order = create(owner, draft)
     path = f"/api/orders/{order['id']}"
     for method, suffix in (("GET", ""), ("PUT", ""), ("POST", "/confirm"), ("POST", "/cancel")):
-        assert other(method, path + suffix, json=draft).status_code == 403
+        hidden = other(method, path + suffix, json=draft)
+        missing = other(method, "/api/orders/4000000000" + suffix, json=draft)
+        assert hidden.status_code == missing.status_code == 404
+        assert hidden.json == missing.json == {"error": "Order not found."}
     assert other("GET", "/api/orders").json["items"] == []
     assert other("GET", "/api/reports").status_code == 403
     assert other("POST", "/api/catalog/products", json={}).status_code == 403
@@ -292,3 +296,16 @@ def test_invalid_unicode_catalog_name_returns_json_validation_error(client_for):
     })
     assert result.status_code == 400
     assert result.json == {"error": "Text must use valid UTF-8."}
+
+
+
+def test_readable_order_numbers_are_unique_and_stable(client_for, draft):
+    sales = client_for("sales")
+    first, second = create(sales, draft), create(sales, draft)
+    year = datetime.now(timezone.utc).year
+    assert first["number"] == f"SO-{year}-{first['id']:06d}"
+    assert second["number"] == f"SO-{year}-{second['id']:06d}"
+    assert first["number"] != second["number"]
+    changed = sales("PUT", f"/api/orders/{first['id']}", json={**draft, "order_date": "2030-01-01"})
+    assert changed.status_code == 200
+    assert changed.json["number"] == first["number"]

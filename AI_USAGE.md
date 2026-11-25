@@ -15,3 +15,5 @@ A second review added regression tests for malformed CSV line numbers and invali
 A further review added regression tests for a cancellation immediately after confirmation and for stock adjustments close to the database limit. The application now captures mutation responses inside the transaction and keeps enough capacity for confirmed orders to return stock. The browser review also caught a catalog editor that could be dismissed during a save. Its close controls now wait for the request to finish.
 
 The final pass used a fresh extraction and a clean environment installed from the documented requirements. Additional API checks found that unsupported methods lost the Allow header and invalid Unicode text could produce a server error. Both cases now have regression coverage.
+
+At the user’s request, Codex also implemented suggestions relayed from Claude for order numbering, order privacy, sample data, Git attribution, and dependency organization.
