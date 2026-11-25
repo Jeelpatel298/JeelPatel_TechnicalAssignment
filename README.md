@@ -45,7 +45,7 @@ Use Python 3.9 or later, MySQL 8.4 with InnoDB, and a current browser with JavaS
 
 ## Load the sample catalog with SQL
 
-After `init-db`, you can load the catalog directly into an empty database.
+After `init-db`, you can load the catalog directly into an empty database. The example below uses Bash or Zsh. From an interactive MySQL client, select the database and run `source sql/sample_data.sql` from the repository directory.
 
 ```sh
 mysql -h 127.0.0.1 -u inventory_app -p sales_inventory < sql/sample_data.sql
@@ -57,9 +57,10 @@ The SQL file starts product balances at zero. After signing in as Admin, use **A
 ## Basic workflow
 
 1. Sign in as a Sales User. Create a draft for Aster Retail with two keyboards, three mice, and a 10% discount. Expected subtotal, discount and total are ₹4,500.00, ₹450.00 and ₹4,050.00.
-2. Confirm the draft. Keyboard stock decreases from 20 to 18 and mouse stock from 50 to 47. After cancelling the confirmed order, stock returns to 20 and 50.
-3. While a confirmed order exists, sign in as Admin and run the reports. The customer summary uses the net order total and the product summary uses gross item amounts.
-4. In CSV import, try [the invalid file](samples/products-invalid.csv), followed by [the valid file](samples/products-valid.csv). The first upload shows row errors. The second adds two products and their positive opening-stock movements.
+2. Confirm the draft. Keyboard stock decreases from 20 to 18 and mouse stock from 50 to 47.
+3. Sign in as Admin and run the reports while the order is confirmed. The customer summary uses the net order total and the product summary uses gross item amounts.
+4. Cancel the confirmed order. Keyboard and mouse stock return to 20 and 50.
+5. In CSV import, try [the invalid file](samples/products-invalid.csv), followed by [the valid file](samples/products-valid.csv). The first upload shows row errors. The second adds two products and their positive opening-stock movements.
 
 ## Database and correctness
 
@@ -119,6 +120,7 @@ The sign-in and order request examples show how to obtain the cookie and use the
 | [inventory/](inventory/) | Flask app, routes, catalog and order services, and browser interface |
 | [sql/schema.sql](sql/schema.sql) | Six-table schema, constraints, indexes, and foreign keys |
 | [sql/reports.sql](sql/reports.sql) | Five standalone SQL reporting queries |
+| [sql/sample_data.sql](sql/sample_data.sql) | Optional sample catalog for direct MySQL import |
 | [API.md](API.md) | Cookie and CSRF workflow, request examples, and response shapes |
 | [DEBUGGING.md](DEBUGGING.md) | Fault analysis, corrected implementation, and regression tests |
 | [AI_USAGE.md](AI_USAGE.md) | AI usage, review, and corrections |

@@ -7,5 +7,6 @@ The corrected [calculate_total](inventory/pricing.py) starts at `Decimal("0.00")
 [The pricing tests](tests/test_pricing.py) exercise both items, an empty list, missing fields, negative and fractional quantities, invalid rates, and half-up order discount rounding.
 
 ```sh
+python -m pip install -r requirements-dev.txt
 python -m pytest -q tests/test_pricing.py
 ```
