@@ -1,19 +1,21 @@
 # AI Usage
 
-**Tool used** — OpenAI Codex.
+## Tools and workflow
 
-**Usage** — Codex read the assignment brief and generated the application, schema, standalone SQL, tests, documentation, and Git commits. Codex also exercised the local app in Chromium, captured the walkthrough, and generated narration using macOS text-to-speech.
+I used OpenAI Codex to help build this assignment from the supplied brief. Codex generated the initial Flask application, MySQL schema and queries, tests, and documentation. I requested several rounds of checking and fixes. I then shared suggestions from a separate Claude review and supplied my email for the submission’s Git history. Codex applied the revisions and recorded and narrated the updated demo.
 
-**Example prompt** — “make properly this assignment”, with the technical assignment PDF attached.
+## Representative requests
 
-**Review** — Codex ran the pricing and debugging tests and the full integration suite using MySQL 8.4.11. Integration coverage includes simultaneous confirmation attempts for the same stock, rollback on a shortage, order ownership, and atomic import. The recorded browser scenarios checked the live totals, stock changes, role restrictions, reports, and CSV feedback against the running local app.
+- Build the assignment from the attached brief.
+- Check the submission again and fix any mistakes found.
+- Apply the review suggestions for readable order numbers, order privacy, SQL sample data, Git attribution, and separate test dependencies.
 
-**Corrections** — The initial MySQL schema used column-level CHECK constraints for rules involving multiple columns. MySQL rejected those definitions, so they were moved to table-level CHECK constraints. The first implementation also relied on Werkzeug's default scrypt hash, which was unavailable in the system Python build used for verification. It now selects salted PBKDF2-SHA256 explicitly. Order dates and movement timestamps were switched to ISO strings so browser date fields receive the expected format.
+## Verification
 
-A second review added regression tests for malformed CSV line numbers and invalid prices, and moved the report queries into one consistent MySQL snapshot to keep concurrent updates from producing contradictory sections.
+Codex verified the extracted submission with a clean dependency install, ran the test suite against MySQL 8.4.11, and exercised the application in Chromium. The checks covered order totals, user permissions, concurrent stock updates, failed-import rollback, the standalone SQL queries, and the reviewer setup steps.
 
-A further review added regression tests for a cancellation immediately after confirmation and for stock adjustments close to the database limit. The application now captures mutation responses inside the transaction and keeps enough capacity for confirmed orders to return stock. The browser review also caught a catalog editor that could be dismissed during a save. Its close controls now wait for the request to finish.
+## Changes made after review
 
-The final pass used a fresh extraction and a clean environment installed from the documented requirements. Additional API checks found that unsupported methods lost the Allow header and invalid Unicode text could produce a server error. Both cases now have regression coverage.
-
-At the user’s request, Codex also implemented suggestions relayed from Claude for order numbering, order privacy, sample data, Git attribution, and dependency organization.
+- CSV import now rejects malformed prices and reports the correct starting line for malformed records.
+- Report queries now share one database snapshot. Order actions capture their response before committing, so a later action cannot change the response to the first request.
+- The review suggestions led to readable order numbers, a 404 response for inaccessible orders, an optional SQL catalog load, and a separate file for test dependencies.
