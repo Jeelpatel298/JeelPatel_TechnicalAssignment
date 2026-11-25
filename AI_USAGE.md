@@ -1,15 +1,17 @@
 # AI Usage
 
-I used OpenAI Codex to implement the assignment from the supplied brief. Codex drafted and refined the Flask application, MySQL schema, SQL reports, tests, and documentation. I requested follow-up reviews, shared suggestions from a Claude review, and supplied the Git author details. Codex recorded the browser demo and used macOS text-to-speech for the narration.
+## Tools and scope
+
+I used OpenAI Codex for implementation, testing, and documentation across the Flask app and MySQL database. I supplied the assignment brief, requested follow-up checks, and selected changes from a Claude review for Codex to apply. Codex captured the demo and used macOS text-to-speech for narration.
 
 ## Representative requests
 
-- Build the application from the attached assignment brief.
-- Review the submission again and fix any issues found.
-- Apply the suggestions on order numbers, access responses, sample SQL, and dependency setup.
+- Build the application to match the assignment brief.
+- Recheck the extracted submission and fix reproducible issues.
+- Apply the review feedback on order numbers, access responses, sample SQL, and test dependencies.
 
 ## Verification and corrections
 
-Codex ran 42 automated tests against MySQL 8.4.11 and checked both user roles in Chromium. The checks covered simultaneous order confirmations, stock restoration, ownership, and CSV rollback. The SQL-only catalog setup and the archived Git history were also verified.
+Codex ran 42 tests on MySQL 8.4.11 and walked through both roles in Chromium. The checks covered concurrent order confirmations, stock restoration, order access, and CSV rollback.
 
-The review corrected line numbers for malformed CSV records and made the sales reports read from a single database snapshot. The follow-up changes gave orders readable identifiers and made inaccessible orders return the same 404 response as missing orders.
+The review found that a malformed CSV record could report the wrong line and that a concurrent order update could make report sections disagree. The fixes report the record's starting line and use one database snapshot for the report. Both fixes have regression tests.
