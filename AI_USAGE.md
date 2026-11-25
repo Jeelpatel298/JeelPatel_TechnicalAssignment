@@ -2,7 +2,9 @@
 
 ## Tools and scope
 
-I used OpenAI Codex for implementation, testing, and documentation across the Flask app and MySQL database. I supplied the assignment brief, requested follow-up checks, and selected changes from a Claude review for Codex to apply. Codex captured the demo and used macOS text-to-speech for narration.
+I used Codex to implement and test the application. I directed the follow-up reviews and chose which changes to incorporate, including readable order IDs and clearer access handling. The final submission was verified with 42 automated tests and a browser walkthrough.
+
+I shared suggestions from a Claude review. Codex captured the demo and used macOS text-to-speech for narration.
 
 ## Representative requests
 
@@ -12,6 +14,6 @@ I used OpenAI Codex for implementation, testing, and documentation across the Fl
 
 ## Verification and corrections
 
-Codex ran 42 tests on MySQL 8.4.11 and walked through both roles in Chromium. The checks covered concurrent order confirmations, stock restoration, order access, and CSV rollback.
+The tests ran on MySQL 8.4.11 and covered concurrent order confirmations, stock restoration, order access, and CSV rollback. The Chromium walkthrough covered both user roles.
 
 The review found that a malformed CSV record could report the wrong line and that a concurrent order update could make report sections disagree. The fixes report the record's starting line and use one database snapshot for the report. Both fixes have regression tests.
